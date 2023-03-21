@@ -13,11 +13,14 @@ for package in required_packages:
         import subprocess
         subprocess.run(['pip', 'install', package])
 
+import argparse
+import ftplib
+import subprocess
+
 # Define the command-line arguments
-parser = argparse.ArgumentParser(description='FTP client to list directories, delete files, download files, upload files, and rename files.')
+parser = argparse.ArgumentParser(description='FTP client to list directories, delete files, download files, and upload files.')
 parser.add_argument('--server', required=True, help='FTP server address')
-parser.add_argument('--username', required=True, help='FTP username')
-parser.add_argument('--password', required=True, help='FTP password')
+parser.add_argument('--credentials', required=True, help='Path to encrypted credentials file')
 parser.add_argument('--list', metavar='DIRECTORY', help='List directories')
 parser.add_argument('--delete', metavar='FILE', help='Delete file')
 parser.add_argument('--download', metavar='FILE', help='Download file')
@@ -26,9 +29,16 @@ parser.add_argument('--upload', metavar=('LOCAL_FILE', 'REMOTE_FILE'), nargs='+'
 # Parse the command-line arguments
 args = parser.parse_args()
 
+# Decrypt the credentials
+result = subprocess.run(['gpg', '--quiet', '--decrypt', args.credentials], capture_output=True)
+if result.returncode != 0:
+    print('Error: failed to decrypt credentials')
+    exit(1)
+username, password = result.stdout.decode().strip().split('\n')
+
 # Connect to the FTP server
 ftp = ftplib.FTP(args.server)
-ftp.login(args.username, args.password)
+ftp.login(username, password)
 
 # Perform the requested operation
 if args.list:
@@ -46,7 +56,7 @@ elif args.upload:
     with open(local_file, 'rb') as f:
         ftp.storbinary('STOR {}'.format(remote_file), f)
     print('File uploaded successfully')
-    
+
 # Close the FTP connection
 ftp.quit()
 
